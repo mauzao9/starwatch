@@ -190,10 +190,10 @@ namespace Starwatch.API
                 
                 //426 is "Too Many Requests" 
                 //https://softwareengineering.stackexchange.com/questions/128512/suggested-http-rest-status-code-for-request-limit-reached
-                args.Response.AddHeader("Retry-After", authentication.RateLimitResetTime.ToString("r"));
-                args.Response.AddHeader("X-RateLimit-Reset", authentication.RateLimitResetTime.ToString("r"));
-                args.Response.AddHeader("X-RateLimit-Limit", authentication.GetRateLimit().ToString());
-                args.Response.AddHeader("X-RateLimit-Remaining", authentication.GetRateLimitRemaining().ToString());
+                args.Response.AppendHeader("Retry-After", authentication.RateLimitResetTime.ToString("r"));
+                args.Response.AppendHeader("X-RateLimit-Reset", authentication.RateLimitResetTime.ToString("r"));
+                args.Response.AppendHeader("X-RateLimit-Limit", authentication.GetRateLimit().ToString());
+                args.Response.AppendHeader("X-RateLimit-Remaining", authentication.GetRateLimitRemaining().ToString());
                 args.Response.WriteRest(new RestResponse(RestStatus.TooManyRequests, msg: "You are being ratelimited.", res: new RateLimitResponse()
                 {
                     Limit = authentication.GetRateLimit(),
@@ -204,9 +204,9 @@ namespace Starwatch.API
             }
 
             //Lets just always add these headers anyways cause why not.
-            args.Response.AddHeader("X-RateLimit-Reset", authentication.RateLimitResetTime.ToString("r"));
-            args.Response.AddHeader("X-RateLimit-Limit", authentication.GetRateLimit().ToString());
-            args.Response.AddHeader("X-RateLimit-Remaining", authentication.GetRateLimitRemaining().ToString());
+            args.Response.AppendHeader("X-RateLimit-Reset", authentication.RateLimitResetTime.ToString("r"));
+            args.Response.AppendHeader("X-RateLimit-Limit", authentication.GetRateLimit().ToString());
+            args.Response.AppendHeader("X-RateLimit-Remaining", authentication.GetRateLimitRemaining().ToString());
 
             //Iterate over every handler and abort when we get the first valid one.
             for (int i = 0; i < requestHandlers.Count; i++)
@@ -290,8 +290,8 @@ namespace Starwatch.API
 
             //Service
             //HttpServer.AddWebSocketService("/", () => new Gateway.GatewayConnection(this));
-            HttpServer.AddWebSocketService<Gateway.EventConnection>(GATEWAY_EVENT_SERVICE, gc => gc.Initialize(this));
-            HttpServer.AddWebSocketService<Gateway.LogConnection>(GATEWAY_LOG_SERVICE, gc => gc.Initialize(this));
+            HttpServer.AddWebSocketService<Gateway.EventConnection>(GATEWAY_EVENT_SERVICE);
+            HttpServer.AddWebSocketService<Gateway.LogConnection>(GATEWAY_LOG_SERVICE);
 
             //Start the actual server
             Logger.Log("Starting HTTP Server on port {0}, secured: {1}", Port, IsSecure);

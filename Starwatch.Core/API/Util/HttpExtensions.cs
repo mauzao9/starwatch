@@ -105,7 +105,7 @@ namespace Starwatch.API.Util
 
             //Get the data and write it
             var buff = File.ReadAllBytes(path);
-            response.WriteContent(buff);
+            response.OutputStream.Write(buff);
         }
  
         /// <summary>
@@ -203,7 +203,7 @@ namespace Starwatch.API.Util
             byte[] buff = encoding.GetBytes(content);
             try
             {
-                response.WriteContent(buff); // to-do: prevent exceptions from closed connections.
+                response.OutputStream.Write(buff); // to-do: prevent exceptions from closed connections.
             }
             catch { }
             
@@ -239,7 +239,7 @@ namespace Starwatch.API.Util
                     memory.Write(chunk, 0, bytesRead);
 
                 //Write the data to the output
-                response.WriteContent(memory.ToArray());
+                response.OutputStream.Write(memory.ToArray());
             }
         }
 

@@ -265,7 +265,7 @@ namespace Starwatch.API.Web
         private void Redirect(HttpRequestEventArgs args, string url)
         {
             var res = args.Response;
-            res.AddHeader("location", url);
+            res.AppendHeader("location", url);
             res.StatusCode = (int)HttpStatusCode.Redirect;
             res.Close();
         }

@@ -39,7 +39,7 @@ namespace Starwatch.API.Gateway
         /// Text representation of the connection. Will use the Authentication name if available, otherwise the user's endpoint.
         /// </summary>
         [JsonProperty]
-        public string Identifier => (Authentication != null ? Authentication.ToString() : Context.UserEndPoint.Address.ToString()) + $"#{ConnectionID}";
+        public string Identifier => (Authentication != null ? Authentication.ToString() : UserEndPoint.Address.ToString()) + $"#{ConnectionID}";
 
         /// <summary>
         /// The authentication of the gateway connection
@@ -99,7 +99,7 @@ namespace Starwatch.API.Gateway
         /// <returns></returns>
         protected bool ValidateAuthentication()
         {
-            _authentication = API.CreateAuthentication(this.Context.User.Identity);
+            _authentication = API.CreateAuthentication(User.Identity);
 
             //Reject Anonymous
             if (Authentication == null)
