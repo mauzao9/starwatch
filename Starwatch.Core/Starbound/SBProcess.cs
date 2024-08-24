@@ -250,12 +250,26 @@ namespace Starwatch.Starbound
                         LogError(ex, "Failed to kill: {0}");
                     }
 
-                    // Wait for the process to exit
-                    Log("Waiting for exit");
-                    if (!_process.WaitForExit(5000)) // 5 seconds timeout
+                    // Wait for the process to exit, with multiple attempts
+                    for (int i = 0; i < 5; i++)  // Retry 5 times
                     {
-                        Log("Process did not exit in time, forcing termination.");
-                        _process.Kill();
+                        if (_process.WaitForExit(1000)) // 1 second per attempt
+                        {
+                            Log("Process exited successfully.");
+                            break;
+                        }
+
+                        Log("Process did not exit, retrying force kill...");
+
+                        // Attempt force kill again
+                        try
+                        {
+                            _process.Kill();
+                        }
+                        catch (Exception ex)
+                        {
+                            LogError(ex, "Failed to force kill on attempt {0}: {1}");
+                        }
                     }
                 }
             }
