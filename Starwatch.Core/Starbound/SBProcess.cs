@@ -55,7 +55,7 @@ namespace Starwatch.Starbound
             this.StartInfo = new ProcessStartInfo()
             {
                 FileName = "/bin/sh",
-                Arguments = $"-c \"cat /tmp/starbound_pipe | {file}\"",
+                Arguments = $"-c \"cat /home/bacon/starbound_pipe | {file}\"",
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
                 UseShellExecute = false
