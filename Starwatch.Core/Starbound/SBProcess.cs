@@ -236,13 +236,23 @@ namespace Starwatch.Starbound
 
             try
             {
-                // Kill the process if we are exiting
+                // Flush and drain the output
+                Log("Flushing and draining output before killing process...");
+                while (!_process.HasExited && !_process.StandardOutput.EndOfStream)
+                {
+                    string output = _process.StandardOutput.ReadLine();
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        p_EnqueueContent(output);
+                    }
+                }
+
+                // Kill the process if it hasn't exited
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Killing Process");
                     try
                     {
-                        _process.StandardOutput.Close();
                         _process.Kill();
                     }
                     catch (System.ComponentModel.Win32Exception ex)
@@ -250,32 +260,22 @@ namespace Starwatch.Starbound
                         LogError(ex, "Failed to kill: {0}");
                     }
 
-                    // Wait for the process to exit, with multiple attempts
-                    for (int i = 0; i < 5; i++)  // Retry 5 times
+                    // Wait for the process to exit, with a timeout
+                    Log("Waiting for exit");
+                    if (!_process.WaitForExit(5000)) // 5 seconds timeout
                     {
-                        if (_process.WaitForExit(1000)) // 1 second per attempt
-                        {
-                            Log("Process exited successfully.");
-                            break;
-                        }
-
-                        Log("Process did not exit, retrying force kill...");
-
-                        // Attempt force kill again
-                        try
-                        {
-                            _process.Kill();
-                        }
-                        catch (Exception ex)
-                        {
-                            LogError(ex, "Failed to force kill on attempt {0}: {1}");
-                        }
+                        Log("Process did not exit in time, forcing termination.");
+                        _process.Kill();
                     }
                 }
             }
             catch (System.InvalidOperationException e)
             {
                 LogError(e, "IOE: {0}");
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "Unexpected error during process kill");
             }
 
             // Dispose of the process
