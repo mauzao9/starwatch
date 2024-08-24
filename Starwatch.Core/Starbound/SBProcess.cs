@@ -1,22 +1,3 @@
-/*
-START LICENSE DISCLAIMER
-Starwatch is a Starbound Server manager with player management, crash recovery and a REST and websocket (live) API. 
-Copyright(C) 2020 Lachee
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see < https://www.gnu.org/licenses/ >.
-END LICENSE DISCLAIMER
-*/
 using Starwatch.Logging;
 using System;
 using System.Collections.Generic;
@@ -57,7 +38,6 @@ namespace Starwatch.Starbound
                 FileName = file,
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true, // Include standard error for full output capture
                 UseShellExecute = false
             };
             this.Logger = logger;
@@ -85,11 +65,10 @@ namespace Starwatch.Starbound
         {
             Log("Aborting State");
             state = State.Aborting;
-            _process?.StandardOutput.Close();  // Close the standard output stream
             p_KillProcess();
         }
 
-        /// <summary>Stops the process and asynchronously waits it to finish cleanup.</summary>
+        /// <summary>Stops the process and asynchronously waits for it to finish cleanup.</summary>
         /// <returns></returns>
         public async Task StopAsync()
         {
@@ -121,7 +100,6 @@ namespace Starwatch.Starbound
 
         private void p_RunThread()
         {
-            StringBuilder sb = new StringBuilder();
             this._threadSemaphore.Wait();
             try
             {
@@ -131,9 +109,11 @@ namespace Starwatch.Starbound
                 // While we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
-                    string result = p_ReadLineWithTimeout();
-                    if (result != null && result.Length > 0)
+                    string result = p_ReadLineWithTimeout(_process, TimeSpan.FromSeconds(2)); // Timeout set to 2 seconds
+                    if (result != null)
+                    {
                         p_EnqueueContent(result);
+                    }
                 }
             }
             catch (Exception e)
@@ -150,16 +130,17 @@ namespace Starwatch.Starbound
             }
         }
 
-        private string p_ReadLineWithTimeout(int timeoutMs = 1000)
+        private string p_ReadLineWithTimeout(Process process, TimeSpan timeout)
         {
-            Task<string> readLineTask = Task.Run(() => _process.StandardOutput.ReadLine());
-            if (readLineTask.Wait(timeoutMs))
+            Task<string> readLineTask = Task.Run(() => process.StandardOutput.ReadLine());
+            if (readLineTask.Wait(timeout))
             {
                 return readLineTask.Result;
             }
             else
             {
-                return null; // Timeout reached
+                Log("ReadLine timed out, moving on...");
+                return null; // Timeout expired, no data read
             }
         }
 
