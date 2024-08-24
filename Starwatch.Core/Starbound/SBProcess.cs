@@ -57,6 +57,7 @@ namespace Starwatch.Starbound
                 FileName = file,
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
+                RedirectStandardInput = true,  // Add this line
                 UseShellExecute = false
             };
             this.Logger = logger;
@@ -87,7 +88,7 @@ namespace Starwatch.Starbound
             p_KillProcess();
         }
 
-        /// <summary>Stops the process and asyncronously waits it to finish cleanup.</summary>
+        /// <summary>Stops the process and asynchronously waits it to finish cleanup.</summary>
         /// <returns></returns>
         public async Task StopAsync()
         {
@@ -244,9 +245,9 @@ namespace Starwatch.Starbound
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Killing Process");
-                    
-                    // Writing a new line to the standard output
-                    Console.WriteLine();  // <-- Added line
+
+                    // Write the message to the starbound_server process
+                    _process.StandardInput.WriteLine("[Info] RCON 127.0.0.1:48042: say <^pink;max_bacon^reset;> oi");
 
                     try
                     {
