@@ -1,7 +1,27 @@
+/*
+START LICENSE DISCLAIMER
+Starwatch is a Starbound Server manager with player management, crash recovery and a REST and websocket (live) API. 
+Copyright(C) 2020 Lachee
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see < https://www.gnu.org/licenses/ >.
+END LICENSE DISCLAIMER
+*/
 using Starwatch.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -46,14 +66,7 @@ namespace Starwatch.Starbound
             this._queue = new Queue<string>(capacity);
         }
 
-        public MemoryUsage GetMemoryUsage()
-        {
-            if (_process != null && !_process.HasExited)
-            {
-                return new MemoryUsage(_process);
-            }
-            return null; // Return null or a default value if the process is not running
-        }
+        public MemoryUsage GetMemoryUsage() { return new MemoryUsage(_process); }
 
         /// <summary>Starts the process</summary>
         public void Start()
@@ -72,7 +85,7 @@ namespace Starwatch.Starbound
         {
             Log("Aborting State");
             state = State.Aborting;
-            p_KillProcess();
+            p_CleanKillProcess();
         }
 
         /// <summary>Stops the process and asynchronously waits for it to finish cleanup.</summary>
@@ -113,34 +126,12 @@ namespace Starwatch.Starbound
                 // Start the process
                 p_StartProcess();
 
-                // Non-blocking output reading
-                Task.Run(() =>
-                {
-                    while (state == State.Running && _process != null && !_process.HasExited)
-                    {
-                        try
-                        {
-                            string line = _process.StandardOutput.ReadLine();
-                            if (!string.IsNullOrEmpty(line))
-                            {
-                                p_EnqueueContent(line);
-                            }
-                        }
-                        catch (InvalidOperationException)
-                        {
-                            // This can occur if the process has already exited, so we just break out.
-                            break;
-                        }
-                    }
-                });
-
-                // Monitor process state
+                // While we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
-                    if (_process.WaitForExit(100))
-                    {
-                        break;
-                    }
+                    string result = _process.StandardOutput.ReadLine();
+                    if (result != null && result.Length > 0)
+                        p_EnqueueContent(result);
                 }
             }
             catch (Exception e)
@@ -152,7 +143,7 @@ namespace Starwatch.Starbound
             {
                 // Finally kill the process, then release our semaphore.
                 Log("Exited Read Loop, aborting and releasing semaphore");
-                p_KillProcess();
+                p_CleanKillProcess();
                 this._threadSemaphore.Release();
             }
         }
@@ -204,7 +195,7 @@ namespace Starwatch.Starbound
             if (!success)
             {
                 Log("Failed, cleaning up...");
-                p_KillProcess();
+                p_CleanKillProcess();
                 return false;
             }
             else
@@ -226,10 +217,10 @@ namespace Starwatch.Starbound
             // Actually kill the process
             Log("Exiting Process ourselves...");
             state = State.Exiting;
-            p_KillProcess();
+            p_CleanKillProcess();
         }
 
-        private bool p_KillProcess()
+        private bool p_CleanKillProcess()
         {
             if (_process == null)
                 return true;
@@ -243,17 +234,36 @@ namespace Starwatch.Starbound
 
             try
             {
-                // Forcefully kill the process with timeout monitoring
-                Log("Starting forceful process termination with timeout monitoring.");
-                Task.Run(() => MonitorProcessExit(_process, 5000)).Wait();
+                // Kill the process if we are exiting
+                if (!_process.HasExited && !isExiting)
+                {
+                    Log("Attempting to cleanly kill the process");
+
+                    try
+                    {
+                        // Send a SIGINT signal for a clean shutdown
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            _process.StandardOutput.Close();
+                            _process.Kill();
+                        }
+                        else
+                        {
+                            Process.Start("kill", $"-2 {_process.Id}").WaitForExit();
+                        }
+                    }
+                    catch (System.ComponentModel.Win32Exception ex)
+                    {
+                        LogError(ex, "Failed to cleanly kill: {0}");
+                    }
+
+                    Log("Waiting for exit");
+                    _process?.WaitForExit();
+                }
             }
             catch (System.InvalidOperationException e)
             {
                 LogError(e, "IOE: {0}");
-            }
-            catch (Exception ex)
-            {
-                LogError(ex, "Unexpected error during process kill");
             }
 
             // Dispose of the process
@@ -261,32 +271,12 @@ namespace Starwatch.Starbound
             _process?.Dispose();
             _process = null;
 
-            Log("Killing finished");
+            Log("Clean killing finished");
             state = State.Offline;
 
             Log("Invoking On Exit");
             Exited?.Invoke();
             return true;
-        }
-
-        private async Task MonitorProcessExit(Process process, int timeoutMilliseconds)
-        {
-            if (process == null || process.HasExited)
-                return;
-
-            try
-            {
-                if (!await Task.Run(() => process.WaitForExit(timeoutMilliseconds)))
-                {
-                    Log("Process did not exit within timeout, forcing termination.");
-                    process.Kill();
-                    process.WaitForExit(); // Ensure the process has exited after killing it
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError(ex, "Error occurred while monitoring process exit.");
-            }
         }
 
         #region Logging
