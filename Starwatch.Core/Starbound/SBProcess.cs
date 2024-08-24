@@ -55,7 +55,7 @@ namespace Starwatch.Starbound
             this.StartInfo = new ProcessStartInfo()
             {
                 FileName = "/bin/sh",
-                Arguments = $"-c \"cat /home/bacon/starbound_pipe | {file}\"",
+                Arguments = $"-c \"screen -dmS starbound_server {file}\"",
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
                 UseShellExecute = false
