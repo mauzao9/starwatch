@@ -54,10 +54,10 @@ namespace Starwatch.Starbound
         {
             this.StartInfo = new ProcessStartInfo()
             {
-                FileName = file,
+                FileName = "/bin/sh",
+                Arguments = $"-c \"cat /tmp/starbound_pipe | {file}\"",
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
-                RedirectStandardInput = true,  // Add this line
                 UseShellExecute = false
             };
             this.Logger = logger;
@@ -88,7 +88,7 @@ namespace Starwatch.Starbound
             p_KillProcess();
         }
 
-        /// <summary>Stops the process and asynchronously waits it to finish cleanup.</summary>
+        /// <summary>Stops the process and asyncronously waits it to finish cleanup.</summary>
         /// <returns></returns>
         public async Task StopAsync()
         {
@@ -132,7 +132,7 @@ namespace Starwatch.Starbound
                 //Start the process
                 p_StartProcess();
 
-                //While we are in a running state and have a process
+                //Whiel we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
                     string result = _process.StandardOutput.ReadLine();
@@ -142,7 +142,7 @@ namespace Starwatch.Starbound
             }
             catch (Exception e)
             {
-                //An exception has occurred
+                //An exception has occured
                 LogError(e);
             }
             finally
@@ -196,7 +196,7 @@ namespace Starwatch.Starbound
 
             _process.Exited += ProcessExited;
 
-            //Start the process
+            //Start the procecss
             Log("Starting Process...");
             var success = _process.Start();
             if (!success)
@@ -245,10 +245,6 @@ namespace Starwatch.Starbound
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Killing Process");
-
-                    // Write the message to the starbound_server process
-                    _process.StandardInput.WriteLine("[Info] RCON 127.0.0.1:48042: say <^pink;max_bacon^reset;> oi");
-
                     try
                     {
                         _process.StandardOutput.Close();
