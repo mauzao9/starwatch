@@ -100,6 +100,12 @@ namespace Starwatch.Starbound
 
         private void p_RunThread()
         {
+            StringBuilder sb = new StringBuilder();
+            int charRead = 0;
+            int charAvailable = 0;
+            char[] buffer = new char[1024];
+            char last = '-';
+
             this._threadSemaphore.Wait();
             try
             {
@@ -109,8 +115,34 @@ namespace Starwatch.Starbound
                 // While we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
-                    string result = p_ReadLineWithTimeout(_process, TimeSpan.FromSeconds(2)); // Timeout set to 2 seconds
-                    if (result != null)
+                    sb.Clear();
+
+                    charAvailable = _process.StandardOutput.Peek();
+                    while (charAvailable > 0)
+                    {
+                        // Read the block and insert into our buffer
+                        int max = Math.Min(charAvailable, buffer.Length);
+                        charRead = _process.StandardOutput.ReadBlock(buffer, 0, max);
+                        sb.Append(buffer, 0, charRead);
+                        charAvailable -= charRead;
+
+                        last = charRead > 0 ? buffer[charRead - 1] : '-';
+                    }
+
+                    if (charRead == 0)
+                        Log("Read 0 Characters!");
+
+                    // We haven't reached the EOL yet, so let's do that
+                    if (state == State.Running && charRead > 0 && last != '\n' && !_process.HasExited)
+                    {
+                        Log("Waiting for EOL to continue");
+                        string eol = _process.StandardOutput.ReadLine();
+                        sb.Append(eol);
+                    }
+
+                    // Enqueue the results
+                    string result = sb.ToString();
+                    if (!string.IsNullOrEmpty(result))
                     {
                         p_EnqueueContent(result);
                     }
@@ -127,20 +159,6 @@ namespace Starwatch.Starbound
                 Log("Exited Read Loop, aborting and releasing semaphore");
                 p_KillProcess();
                 this._threadSemaphore.Release();
-            }
-        }
-
-        private string p_ReadLineWithTimeout(Process process, TimeSpan timeout)
-        {
-            Task<string> readLineTask = Task.Run(() => process.StandardOutput.ReadLine());
-            if (readLineTask.Wait(timeout))
-            {
-                return readLineTask.Result;
-            }
-            else
-            {
-                Log("ReadLine timed out, moving on...");
-                return null; // Timeout expired, no data read
             }
         }
 
