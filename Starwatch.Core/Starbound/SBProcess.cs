@@ -131,40 +131,9 @@ namespace Starwatch.Starbound
                 //Start the process
                 p_StartProcess();
 
-                //Whiel we are in a running state and have a process
+                //While we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
-                    /*
-                    //Reset the string builder
-                    sb.Clear();
-
-                    charAvailable = _process.StandardOutput.Peek();
-                    while (charAvailable > 0)
-                    {
-                        //Read the block and insert into our buffer
-                        int max = Math.Min(charAvailable, buffer.Length);
-                        charRead = _process.StandardOutput.ReadBlock(buffer, 0, max);
-                        sb.Append(buffer, 0, charRead);
-                        charAvailable -= charRead;
-
-                        last = charRead > 0 ? buffer[charRead - 1] : '-';
-                    }
-
-                    if (charRead == 0)
-                        Log("Read 0 Characters!");
-
-                    //We havn't reached the EOL yet, so lets do that
-                    if (state == State.Running && charRead > 0 && last != '\n' && !_process.HasExited)
-                    {
-                        Log("Waiting for EOL to continue");
-                        string eol = _process.StandardOutput.ReadLine();
-                        sb.Append(eol);
-                    }
-
-                    //Enqueue the results
-                    string result = sb.ToString();
-                    */
-
                     string result = _process.StandardOutput.ReadLine();
                     if (result != null && result.Length > 0) 
                         p_EnqueueContent(result);
@@ -172,7 +141,7 @@ namespace Starwatch.Starbound
             }
             catch (Exception e)
             {
-                //An exception has occured
+                //An exception has occurred
                 LogError(e);
             }
             finally
@@ -226,7 +195,7 @@ namespace Starwatch.Starbound
 
             _process.Exited += ProcessExited;
 
-            //Start the procecss
+            //Start the process
             Log("Starting Process...");
             var success = _process.Start();
             if (!success)
@@ -275,6 +244,10 @@ namespace Starwatch.Starbound
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Killing Process");
+                    
+                    // Writing a new line to the standard output
+                    Console.WriteLine();  // <-- Added line
+
                     try
                     {
                         _process.StandardOutput.Close();
