@@ -46,7 +46,14 @@ namespace Starwatch.Starbound
             this._queue = new Queue<string>(capacity);
         }
 
-        public MemoryUsage GetMemoryUsage() { return new MemoryUsage(_process); }
+        public MemoryUsage GetMemoryUsage()
+        {
+            if (_process != null && !_process.HasExited)
+            {
+                return new MemoryUsage(_process);
+            }
+            return null; // Return null or a default value if the process is not running
+        }
 
         /// <summary>Starts the process</summary>
         public void Start()
@@ -236,38 +243,9 @@ namespace Starwatch.Starbound
 
             try
             {
-                // Flush and drain the output
-                Log("Flushing and draining output before killing process...");
-                while (!_process.HasExited && !_process.StandardOutput.EndOfStream)
-                {
-                    string output = _process.StandardOutput.ReadLine();
-                    if (!string.IsNullOrEmpty(output))
-                    {
-                        p_EnqueueContent(output);
-                    }
-                }
-
-                // Kill the process if it hasn't exited
-                if (!_process.HasExited && !isExiting)
-                {
-                    Log("Killing Process");
-                    try
-                    {
-                        _process.Kill();
-                    }
-                    catch (System.ComponentModel.Win32Exception ex)
-                    {
-                        LogError(ex, "Failed to kill: {0}");
-                    }
-
-                    // Wait for the process to exit, with a timeout
-                    Log("Waiting for exit");
-                    if (!_process.WaitForExit(5000)) // 5 seconds timeout
-                    {
-                        Log("Process did not exit in time, forcing termination.");
-                        _process.Kill();
-                    }
-                }
+                // Forcefully kill the process with timeout monitoring
+                Log("Starting forceful process termination with timeout monitoring.");
+                Task.Run(() => MonitorProcessExit(_process, 5000)).Wait();
             }
             catch (System.InvalidOperationException e)
             {
@@ -289,6 +267,26 @@ namespace Starwatch.Starbound
             Log("Invoking On Exit");
             Exited?.Invoke();
             return true;
+        }
+
+        private async Task MonitorProcessExit(Process process, int timeoutMilliseconds)
+        {
+            if (process == null || process.HasExited)
+                return;
+
+            try
+            {
+                if (!await Task.Run(() => process.WaitForExit(timeoutMilliseconds)))
+                {
+                    Log("Process did not exit within timeout, forcing termination.");
+                    process.Kill();
+                    process.WaitForExit(); // Ensure the process has exited after killing it
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "Error occurred while monitoring process exit.");
+            }
         }
 
         #region Logging
