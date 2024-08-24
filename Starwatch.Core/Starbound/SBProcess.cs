@@ -57,7 +57,6 @@ namespace Starwatch.Starbound
                 FileName = file,
                 WorkingDirectory = directory,
                 RedirectStandardOutput = true,
-                RedirectStandardInput = true, // Allow input redirection
                 UseShellExecute = false
             };
             this.Logger = logger;
@@ -80,30 +79,16 @@ namespace Starwatch.Starbound
             _thread.Start();
         }
 
-        /// <summary>Sends a command to the server's standard input.</summary>
-        /// <param name="command">The command to send.</param>
-        public void SendCommand(string command)
-        {
-            if (_process != null && !_process.HasExited)
-            {
-                _process.StandardInput.WriteLine(command);
-                _process.StandardInput.Flush();
-            }
-            else
-            {
-                Log("Process is not running or has exited.");
-            }
-        }
-
         /// <summary>Stops the process</summary>
         public void Stop()
         {
             Log("Aborting State");
             state = State.Aborting;
+            _process?.StandardOutput.Close();  // Close the standard output stream
             p_KillProcess();
         }
 
-        /// <summary>Stops the process and asynchronously waits for it to finish cleanup.</summary>
+        /// <summary>Stops the process and asynchronously waits it to finish cleanup.</summary>
         /// <returns></returns>
         public async Task StopAsync()
         {
@@ -144,25 +129,56 @@ namespace Starwatch.Starbound
             this._threadSemaphore.Wait();
             try
             {
-                // Start the process
+                //Start the process
                 p_StartProcess();
 
-                // While we are in a running state and have a process
+                //While we are in a running state and have a process
                 while (state == State.Running && _process != null)
                 {
+                    /*
+                    //Reset the string builder
+                    sb.Clear();
+
+                    charAvailable = _process.StandardOutput.Peek();
+                    while (charAvailable > 0)
+                    {
+                        //Read the block and insert into our buffer
+                        int max = Math.Min(charAvailable, buffer.Length);
+                        charRead = _process.StandardOutput.ReadBlock(buffer, 0, max);
+                        sb.Append(buffer, 0, charRead);
+                        charAvailable -= charRead;
+
+                        last = charRead > 0 ? buffer[charRead - 1] : '-';
+                    }
+
+                    if (charRead == 0)
+                        Log("Read 0 Characters!");
+
+                    //We haven't reached the EOL yet, so let's do that
+                    if (state == State.Running && charRead > 0 && last != '\n' && !_process.HasExited)
+                    {
+                        Log("Waiting for EOL to continue");
+                        string eol = _process.StandardOutput.ReadLine();
+                        sb.Append(eol);
+                    }
+
+                    //Enqueue the results
+                    string result = sb.ToString();
+                    */
+
                     string result = _process.StandardOutput.ReadLine();
-                    if (result != null && result.Length > 0)
+                    if (result != null && result.Length > 0) 
                         p_EnqueueContent(result);
                 }
             }
             catch (Exception e)
             {
-                // An exception has occurred
+                //An exception has occurred
                 LogError(e);
             }
             finally
             {
-                // Finally kill the process, then release our semaphore.
+                //Finally kill the process, then release our semaphore.
                 Log("Exited Read Loop, aborting and releasing semaphore");
                 p_KillProcess();
                 this._threadSemaphore.Release();
@@ -171,14 +187,14 @@ namespace Starwatch.Starbound
 
         private void p_EnqueueContent(string content)
         {
-            // Wait for our turn to add more content
+            //Wait for our turn to add more content
             this._queueSemaphore.Wait();
             try
             {
-                // Split the logs up, adding each one 
+                //Split the logs up, adding each one 
                 foreach (var p in TagRegex.Split(content))
                 {
-                    // Regex gives us empties?
+                    //Regex gives us empties?
                     string str = p.Trim().Replace("\r", "\\r").Replace("\n", "\\n");
                     if (str.Length > 0)
                         this._queue.Enqueue(str);
@@ -186,7 +202,7 @@ namespace Starwatch.Starbound
             }
             finally
             {
-                // Finally release the queue
+                //Finally release the queue
                 this._queueSemaphore.Release();
             }
         }
@@ -197,10 +213,10 @@ namespace Starwatch.Starbound
             if (_process != null)
                 throw new InvalidOperationException("Cannot start the process while it is already running.");
 
-            // Update the state
+            //Update the state
             state = State.Starting;
 
-            // Create the process and hook into our events
+            //Create the process and hook into our events
             Log("Creating Process...");
             _process = new Process()
             {
@@ -210,7 +226,7 @@ namespace Starwatch.Starbound
 
             _process.Exited += ProcessExited;
 
-            // Start the process
+            //Start the process
             Log("Starting Process...");
             var success = _process.Start();
             if (!success)
@@ -231,11 +247,11 @@ namespace Starwatch.Starbound
         {
             Log("Process has exited.");
 
-            // We are already killing the process, abort!
+            //We are already killing the process, abort!
             if (state == State.Killing)
                 return;
 
-            // Actually kill the process
+            //Actually kill the process
             Log("Exiting Process ourselves...");
             state = State.Exiting;
             p_KillProcess();
@@ -249,13 +265,13 @@ namespace Starwatch.Starbound
             if (state == State.Killing)
                 return false;
 
-            // Update the state
+            //Update the state
             bool isExiting = state == State.Exiting;
             state = State.Killing;
 
             try
             {
-                // Kill the process if we are exiting
+                //Kill the process if we are exiting
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Killing Process");
@@ -269,7 +285,7 @@ namespace Starwatch.Starbound
                         LogError(ex, "Failed to kill: {0}");
                     }
 
-                    // Read to end then wait for exit
+                    //Read to end then wait for exit
                     Log("Reading until end...");
 
                     Log("Waiting for exit");
@@ -281,7 +297,7 @@ namespace Starwatch.Starbound
                 LogError(e, "IOE: {0}");
             }
 
-            // Dispose of the process
+            //Dispose of the process
             Log("Disposing and cleaning up process");
             _process?.Dispose();
             _process = null;
@@ -295,7 +311,7 @@ namespace Starwatch.Starbound
         }
 
         #region Logging
-        private void LogError(Exception e, string format = "ERRO: {0}") { Logger.LogError(e, format); }
+        private void LogError(Exception e, string format = "ERRO: {0}") { Logger.LogError(e, format);  }
         private void Log(string log) { Logger.Log(log); }
 
         /// <summary>
