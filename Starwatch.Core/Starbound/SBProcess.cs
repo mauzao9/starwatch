@@ -234,11 +234,12 @@ namespace Starwatch.Starbound
 
             try
             {
-                // Kill the process if we are exiting
+                // Attempt to cleanly kill the process
                 if (!_process.HasExited && !isExiting)
                 {
                     Log("Attempting to cleanly kill the process");
 
+                    int originalProcessId = _process.Id;
                     try
                     {
                         // Send a SIGINT signal for a clean shutdown
@@ -249,12 +250,30 @@ namespace Starwatch.Starbound
                         }
                         else
                         {
-                            Process.Start("kill", $"-2 {_process.Id}").WaitForExit();
+                            Process.Start("kill", $"-2 {originalProcessId}").WaitForExit();
+                        }
+
+                        // Wait 5 seconds to see if the process exits and has a different ID (indicating a restart)
+                        Thread.Sleep(5000);
+
+                        if (!_process.HasExited || (_process.HasExited && Process.GetProcessById(originalProcessId) != null))
+                        {
+                            Log("Process did not exit or restarted, force killing");
+
+                            // Force kill the process if it didn't exit or restarted
+                            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                            {
+                                _process.Kill();
+                            }
+                            else
+                            {
+                                Process.Start("kill", $"-9 {originalProcessId}").WaitForExit();
+                            }
                         }
                     }
-                    catch (System.ComponentModel.Win32Exception ex)
+                    catch (Exception ex)
                     {
-                        LogError(ex, "Failed to cleanly kill: {0}");
+                        LogError(ex, "Failed to cleanly or forcefully kill: {0}");
                     }
 
                     Log("Waiting for exit");
