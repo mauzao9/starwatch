@@ -100,51 +100,39 @@ namespace Starwatch.Starbound
 
         private void p_RunThread()
         {
-            StringBuilder sb = new StringBuilder();
-            int charRead = 0;
-            int charAvailable = 0;
-            char[] buffer = new char[1024];
-            char last = '-';
-
             this._threadSemaphore.Wait();
             try
             {
                 // Start the process
                 p_StartProcess();
 
-                // While we are in a running state and have a process
+                // Non-blocking output reading
+                Task.Run(() =>
+                {
+                    while (state == State.Running && _process != null && !_process.HasExited)
+                    {
+                        try
+                        {
+                            string line = _process.StandardOutput.ReadLine();
+                            if (!string.IsNullOrEmpty(line))
+                            {
+                                p_EnqueueContent(line);
+                            }
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // This can occur if the process has already exited, so we just break out.
+                            break;
+                        }
+                    }
+                });
+
+                // Monitor process state
                 while (state == State.Running && _process != null)
                 {
-                    sb.Clear();
-
-                    charAvailable = _process.StandardOutput.Peek();
-                    while (charAvailable > 0)
+                    if (_process.WaitForExit(100))
                     {
-                        // Read the block and insert into our buffer
-                        int max = Math.Min(charAvailable, buffer.Length);
-                        charRead = _process.StandardOutput.ReadBlock(buffer, 0, max);
-                        sb.Append(buffer, 0, charRead);
-                        charAvailable -= charRead;
-
-                        last = charRead > 0 ? buffer[charRead - 1] : '-';
-                    }
-
-                    if (charRead == 0)
-                        Log("Read 0 Characters!");
-
-                    // We haven't reached the EOL yet, so let's do that
-                    if (state == State.Running && charRead > 0 && last != '\n' && !_process.HasExited)
-                    {
-                        Log("Waiting for EOL to continue");
-                        string eol = _process.StandardOutput.ReadLine();
-                        sb.Append(eol);
-                    }
-
-                    // Enqueue the results
-                    string result = sb.ToString();
-                    if (!string.IsNullOrEmpty(result))
-                    {
-                        p_EnqueueContent(result);
+                        break;
                     }
                 }
             }
@@ -262,11 +250,13 @@ namespace Starwatch.Starbound
                         LogError(ex, "Failed to kill: {0}");
                     }
 
-                    // Read to end then wait for exit
-                    Log("Reading until end...");
-
+                    // Wait for the process to exit
                     Log("Waiting for exit");
-                    _process?.WaitForExit();
+                    if (!_process.WaitForExit(5000)) // 5 seconds timeout
+                    {
+                        Log("Process did not exit in time, forcing termination.");
+                        _process.Kill();
+                    }
                 }
             }
             catch (System.InvalidOperationException e)
