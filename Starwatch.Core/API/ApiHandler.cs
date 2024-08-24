@@ -290,8 +290,8 @@ namespace Starwatch.API
 
             //Service
             //HttpServer.AddWebSocketService("/", () => new Gateway.GatewayConnection(this));
-            HttpServer.AddWebSocketService<Gateway.EventConnection>(GATEWAY_EVENT_SERVICE);
-            HttpServer.AddWebSocketService<Gateway.LogConnection>(GATEWAY_LOG_SERVICE);
+            HttpServer.AddWebSocketService<Gateway.EventConnection>(GATEWAY_EVENT_SERVICE, gc => gc.Initialize(this));
+            HttpServer.AddWebSocketService<Gateway.LogConnection>(GATEWAY_LOG_SERVICE, gc => gc.Initialize(this));
 
             //Start the actual server
             Logger.Log("Starting HTTP Server on port {0}, secured: {1}", Port, IsSecure);
